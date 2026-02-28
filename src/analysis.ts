@@ -26,16 +26,17 @@ export function analyzeTimeEntries(
 
   // Grouping
   entries.forEach(entry => {
-    const fullName = `${entry.imie} ${entry.nazwisko}`.trim();
+    const fullName = `${entry.imie || ''} ${entry.nazwisko || ''}`.trim() || 'Nieznana Osoba';
+    const entryData = entry.data || 'Brak daty';
     if (!entriesByPerson[fullName]) entriesByPerson[fullName] = [];
     entriesByPerson[fullName].push(entry);
 
     if (!entriesByPersonAndDate[fullName]) entriesByPersonAndDate[fullName] = {};
-    if (!entriesByPersonAndDate[fullName][entry.data]) entriesByPersonAndDate[fullName][entry.data] = [];
-    entriesByPersonAndDate[fullName][entry.data].push(entry);
+    if (!entriesByPersonAndDate[fullName][entryData]) entriesByPersonAndDate[fullName][entryData] = [];
+    entriesByPersonAndDate[fullName][entryData].push(entry);
 
-    if (!entriesByDate[entry.data]) entriesByDate[entry.data] = [];
-    entriesByDate[entry.data].push(entry);
+    if (!entriesByDate[entryData]) entriesByDate[entryData] = [];
+    entriesByDate[entryData].push(entry);
   });
 
   const severityWeights = {
@@ -47,64 +48,68 @@ export function analyzeTimeEntries(
 
   // 1. Per entry anomalies (Categories A, B, D, E, F)
   entries.forEach((entry, index) => {
-    const fullName = `${entry.imie} ${entry.nazwisko}`.trim();
+    const fullName = `${entry.imie || ''} ${entry.nazwisko || ''}`.trim() || 'Nieznana Osoba';
     const entryId = `entry-${index}`;
+    const entryOpis = (entry.opis || '').trim();
+    const entryZadanie = (entry.zadanie || '').trim();
+    const entryProjekt = (entry.projekt || '').trim();
+    const entryData = entry.data || 'Brak daty';
 
     // --- CATEGORY A: DATA QUALITY ---
     // A1. BRAK OPISU (LOW)
-    if (entry.godziny > 0 && (!entry.opis || entry.opis.trim() === "" || entry.opis.trim() === "-")) {
+    if (entry.godziny > 0 && (!entryOpis || entryOpis === "" || entryOpis === "-")) {
       anomalies.push({
         id: `${entryId}-A1`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Jakość danych. BRAK OPISU",
         severity: Severity.LOW,
         opis: "Pole Opis jest puste.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
 
     // A2. OPIS OGOLNIKOWY (LOW)
     const genericTerms = ["development", "testy", "daily", "spotkanie", "praca", "zadania"];
-    const descLower = entry.opis.trim().toLowerCase();
-    const taskLower = entry.zadanie.toLowerCase();
-    if (entry.godziny > 0 && entry.opis.trim() !== "") {
-      const wordCount = entry.opis.trim().split(/\s+/).length;
+    const descLower = entryOpis.toLowerCase();
+    const taskLower = entryZadanie.toLowerCase();
+    if (entry.godziny > 0 && entryOpis !== "") {
+      const wordCount = entryOpis.split(/\s+/).length;
       if (wordCount < 3 || genericTerms.includes(descLower) || descLower === taskLower) {
         anomalies.push({
           id: `${entryId}-A2`,
           osoba: fullName,
-          data: entry.data,
-          projekt: entry.projekt,
-          zadanie: entry.zadanie,
+          data: entryData,
+          projekt: entryProjekt,
+          zadanie: entryZadanie,
           godziny: entry.godziny,
           kategoria: "Jakość danych. OPIS OGÓLNIKOWY",
           severity: Severity.LOW,
           opis: "Opis zbyt krótki lub zbyt ogólny.",
-          wpisOpis: entry.opis,
+          wpisOpis: entryOpis,
           rawRow: entry.rawRow
         });
       }
     }
 
     // A3. BRAK ZADANIA (LOW)
-    const isInternalActivities = entry.projekt.toLowerCase().includes("internal activities");
-    if (isInternalActivities && (!entry.zadanie || entry.zadanie.trim() === "")) {
+    const isInternalActivities = entryProjekt.toLowerCase().includes("internal activities");
+    if (isInternalActivities && (!entryZadanie || entryZadanie === "")) {
       anomalies.push({
         id: `${entryId}-A3`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Jakość danych. BRAK ZADANIA",
         severity: Severity.LOW,
         opis: "Pole Zadanie jest puste w projekcie Internal Activities.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
@@ -115,31 +120,31 @@ export function analyzeTimeEntries(
       anomalies.push({
         id: `${entryId}-A7`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Jakość danych. NAZWA NARZĘDZIA",
         severity: Severity.LOW,
         opis: "Opis zawiera tylko nazwę narzędzia.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
 
-    // A8. BRAK OPISU PRZY DUZEJ LICZBIE GODZIN (MEDIUM)
-    if (entry.godziny > 4 && (!entry.opis || entry.opis.trim() === "")) {
+    // A8. BRAK OPISU PRZY DUZEBIE LICZBIE GODZIN (MEDIUM)
+    if (entry.godziny > 4 && (!entryOpis || entryOpis === "")) {
       anomalies.push({
         id: `${entryId}-A8`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Jakość danych. BRAK OPISU (>4h)",
         severity: Severity.MEDIUM,
         opis: "Brak opisu przy wpisie powyżej 4h.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
@@ -150,49 +155,51 @@ export function analyzeTimeEntries(
       anomalies.push({
         id: `${entryId}-B13`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Czas. WPIS >8H",
         severity: Severity.MEDIUM,
         opis: "Pojedynczy wpis przekracza 8h.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
 
     // B14/B15. WEEKENDY
     try {
-      const date = parse(entry.data, "yyyy-MM-dd", new Date());
-      if (date.getDay() === 6) { // Saturday
-        anomalies.push({
-          id: `${entryId}-B14`,
-          osoba: fullName,
-          data: entry.data,
-          projekt: entry.projekt,
-          zadanie: entry.zadanie,
-          godziny: entry.godziny,
-          kategoria: "Czas. PRACA W SOBOTĘ",
-          severity: Severity.MEDIUM,
-          opis: "Wpis zaraportowany w sobotę.",
-          wpisOpis: entry.opis,
-          rawRow: entry.rawRow
-        });
-      } else if (date.getDay() === 0) { // Sunday
-        anomalies.push({
-          id: `${entryId}-B15`,
-          osoba: fullName,
-          data: entry.data,
-          projekt: entry.projekt,
-          zadanie: entry.zadanie,
-          godziny: entry.godziny,
-          kategoria: "Czas. PRACA W NIEDZIELĘ",
-          severity: Severity.HIGH,
-          opis: "Wpis zaraportowany w niedzielę.",
-          wpisOpis: entry.opis,
-          rawRow: entry.rawRow
-        });
+      if (entryData && entryData !== 'Brak daty') {
+        const date = parse(entryData, "yyyy-MM-dd", new Date());
+        if (date.getDay() === 6) { // Saturday
+          anomalies.push({
+            id: `${entryId}-B14`,
+            osoba: fullName,
+            data: entryData,
+            projekt: entryProjekt,
+            zadanie: entryZadanie,
+            godziny: entry.godziny,
+            kategoria: "Czas. PRACA W SOBOTĘ",
+            severity: Severity.MEDIUM,
+            opis: "Wpis zaraportowany w sobotę.",
+            wpisOpis: entryOpis,
+            rawRow: entry.rawRow
+          });
+        } else if (date.getDay() === 0) { // Sunday
+          anomalies.push({
+            id: `${entryId}-B15`,
+            osoba: fullName,
+            data: entryData,
+            projekt: entryProjekt,
+            zadanie: entryZadanie,
+            godziny: entry.godziny,
+            kategoria: "Czas. PRACA W NIEDZIELĘ",
+            severity: Severity.HIGH,
+            opis: "Wpis zaraportowany w niedzielę.",
+            wpisOpis: entryOpis,
+            rawRow: entry.rawRow
+          });
+        }
       }
     } catch (e) {}
 
@@ -201,14 +208,14 @@ export function analyzeTimeEntries(
       anomalies.push({
         id: `${entryId}-B17`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Czas. WPIS 0.0h",
         severity: Severity.LOW,
         opis: "Wpis z zerową liczbą godzin bez nieobecności.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
@@ -218,14 +225,14 @@ export function analyzeTimeEntries(
       anomalies.push({
         id: `${entryId}-B18`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Czas. BŁĘDNE GODZINY",
         severity: Severity.CRITICAL,
         opis: "Wartość godzin jest ujemna lub nieprawidłowa.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
@@ -235,14 +242,14 @@ export function analyzeTimeEntries(
       anomalies.push({
         id: `${entryId}-B19`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Czas. MIKROCZAS",
         severity: Severity.LOW,
         opis: "Wpis poniżej 15 minut.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
@@ -253,31 +260,31 @@ export function analyzeTimeEntries(
       anomalies.push({
         id: `${entryId}-E44`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Billable/Non-billable. NADMIERNE SPOTKANIA",
         severity: Severity.MEDIUM,
         opis: "Pojedynczy wpis na spotkania wewnętrzne > 4h.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
 
     // E47. SAMOROZWOJ BEZ OPISU (MEDIUM)
-    if (taskLower.includes("samorozwój") && (!entry.opis || entry.opis.trim() === "")) {
+    if (taskLower.includes("samorozwój") && (!entryOpis || entryOpis === "")) {
       anomalies.push({
         id: `${entryId}-E47`,
         osoba: fullName,
-        data: entry.data,
-        projekt: entry.projekt,
-        zadanie: entry.zadanie,
+        data: entryData,
+        projekt: entryProjekt,
+        zadanie: entryZadanie,
         godziny: entry.godziny,
         kategoria: "Billable/Non-billable. SAMOROZWÓJ BEZ OPISU",
         severity: Severity.MEDIUM,
         opis: "Godziny na samorozwój bez opisu merytorycznego.",
-        wpisOpis: entry.opis,
+        wpisOpis: entryOpis,
         rawRow: entry.rawRow
       });
     }
@@ -513,8 +520,8 @@ export function analyzeTimeEntries(
   entries.forEach(e => {
     const key = `${e.projekt}|${e.zadanie}`;
     if (!taskStatsMap[key]) {
-      const isBillable = billableProjects.some(p => e.projekt.toLowerCase().includes(p.toLowerCase()));
-      const isInternal = internalProjects.some(p => e.projekt.toLowerCase().includes(p.toLowerCase()));
+      const isBillable = billableProjects.some(p => (e.projekt || '').toLowerCase().includes(p.toLowerCase()));
+      const isInternal = internalProjects.some(p => (e.projekt || '').toLowerCase().includes(p.toLowerCase()));
       taskStatsMap[key] = {
         projekt: e.projekt,
         zadanie: e.zadanie,
@@ -531,8 +538,8 @@ export function analyzeTimeEntries(
   // Project Stats
   entries.forEach(e => {
     if (!projectStats[e.projekt]) {
-      const isBillable = billableProjects.some(p => e.projekt.toLowerCase().includes(p.toLowerCase()));
-      const isInternal = internalProjects.some(p => e.projekt.toLowerCase().includes(p.toLowerCase()));
+      const isBillable = billableProjects.some(p => (e.projekt || '').toLowerCase().includes(p.toLowerCase()));
+      const isInternal = internalProjects.some(p => (e.projekt || '').toLowerCase().includes(p.toLowerCase()));
       projectStats[e.projekt] = {
         projekt: e.projekt,
         typ: isBillable ? "Kliencki" : isInternal ? "Wewnętrzny" : "Nieznany",

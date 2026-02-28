@@ -61,6 +61,7 @@ export default function App() {
   const [uniqueProjects, setUniqueProjects] = useState<string[]>([]);
   const [selectedInternalProjects, setSelectedInternalProjects] = useState<Set<string>>(new Set<string>());
   const [isSelectingProjects, setIsSelectingProjects] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
@@ -70,76 +71,110 @@ export default function App() {
     if (!csvData.trim()) return;
     
     setIsAnalyzing(true);
+    setError(null);
     
     setTimeout(() => {
-      Papa.parse(csvData, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          const allEntries: TimeEntry[] = results.data.map((row: any) => ({
-            data: row['Data'] || '',
-            nazwisko: row['Nazwisko'] || '',
-            imie: row['Imie'] || '',
-            przelozony: row['Przelozony'] || '',
-            projekt: row['Projekt'] || '',
-            zadanie: row['Zadanie'] || '',
-            opis: row['Opis'] || '',
-            godziny: parseFloat(row['Godziny']) || 0,
-            nieobecnosc: row['Nieobecnosc'] || '',
-            rawRow: row
-          }));
+      try {
+        Papa.parse(csvData, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            try {
+              if (!results.data || results.data.length === 0) {
+                throw new Error('Plik CSV jest pusty lub ma nieprawidłowy format.');
+              }
 
-          const projects = Array.from(new Set(allEntries.map(e => e.projekt))).sort();
-          setUniqueProjects(projects);
-          setParsedEntries(allEntries);
-          
-          // Pre-select projects that look internal
-          const initialInternal = new Set<string>();
-          projects.forEach(p => {
-            if (p.toLowerCase().includes("qodeca") || 
-                p.toLowerCase().includes("internal") ||
-                DEFAULT_INTERNAL_PROJECTS.some(dp => p.toLowerCase().includes(dp.toLowerCase()))) {
-              initialInternal.add(p);
+              const allEntries: TimeEntry[] = results.data
+                .filter((row: any) => row['Nazwisko'] || row['Projekt'] || row['Godziny'])
+                .map((row: any) => ({
+                  data: row['Data'] || '',
+                  nazwisko: row['Nazwisko'] || '',
+                  imie: row['Imie'] || '',
+                  przelozony: row['Przelozony'] || '',
+                  projekt: row['Projekt'] || '',
+                  zadanie: row['Zadanie'] || '',
+                  opis: row['Opis'] || '',
+                  godziny: parseFloat(row['Godziny']) || 0,
+                  nieobecnosc: row['Nieobecnosc'] || '',
+                  rawRow: row
+                }));
+
+              if (allEntries.length === 0) {
+                throw new Error('Nie znaleziono żadnych poprawnych wpisów w pliku CSV.');
+              }
+
+              const projects = Array.from(new Set(allEntries.map(e => e.projekt))).sort();
+              setUniqueProjects(projects);
+              setParsedEntries(allEntries);
+              
+              // Pre-select projects that look internal
+              const initialInternal = new Set<string>();
+              projects.forEach(p => {
+                if (p && (p.toLowerCase().includes("qodeca") || 
+                    p.toLowerCase().includes("internal") ||
+                    DEFAULT_INTERNAL_PROJECTS.some(dp => p.toLowerCase().includes(dp.toLowerCase())))) {
+                  initialInternal.add(p);
+                }
+              });
+              setSelectedInternalProjects(initialInternal);
+              
+              setIsSelectingProjects(true);
+              setIsAnalyzing(false);
+            } catch (err: any) {
+              console.error(err);
+              setError(err.message || 'Wystąpił nieoczekiwany błąd podczas przetwarzania danych.');
+              setIsAnalyzing(false);
             }
-          });
-          setSelectedInternalProjects(initialInternal);
-          
-          setIsSelectingProjects(true);
-          setIsAnalyzing(false);
-        },
-        error: (err) => {
-          console.error(err);
-          setIsAnalyzing(false);
-          alert('Błąd podczas parsowania CSV.');
-        }
-      });
+          },
+          error: (err) => {
+            console.error(err);
+            setError('Błąd podczas parsowania CSV: ' + err.message);
+            setIsAnalyzing(false);
+          }
+        });
+      } catch (err: any) {
+        console.error(err);
+        setError('Wystąpił błąd krytyczny: ' + err.message);
+        setIsAnalyzing(false);
+      }
     }, 800);
   };
 
   const handleStartAnalysis = () => {
     setIsAnalyzing(true);
+    setError(null);
     setDismissedAnomalies(new Set());
     setSelectedAnomalies(new Set());
 
     setTimeout(() => {
-      const internalList = Array.from<string>(selectedInternalProjects);
-      
-      // Filter for selected internal projects
-      const qodecaEntries = parsedEntries.filter(e => 
-        selectedInternalProjects.has(e.projekt)
-      );
+      try {
+        const internalList = Array.from<string>(selectedInternalProjects);
+        
+        // Filter for selected internal projects
+        const qodecaEntries = parsedEntries.filter(e => 
+          selectedInternalProjects.has(e.projekt)
+        );
 
-      const analysis = analyzeTimeEntries(
-        qodecaEntries,
-        152, // Default required hours
-        billableProjects.split(',').map(p => p.trim()),
-        internalList
-      );
-      
-      setResult(analysis);
-      setIsSelectingProjects(false);
-      setIsAnalyzing(false);
-      setActiveTab('summary');
+        if (qodecaEntries.length === 0) {
+          throw new Error('Brak wpisów dla wybranych projektów wewnętrznych.');
+        }
+
+        const analysis = analyzeTimeEntries(
+          qodecaEntries,
+          152, // Default required hours
+          billableProjects.split(',').map(p => p.trim()),
+          internalList
+        );
+        
+        setResult(analysis);
+        setIsSelectingProjects(false);
+        setIsAnalyzing(false);
+        setActiveTab('summary');
+      } catch (err: any) {
+        console.error(err);
+        setError('Błąd podczas analizy: ' + err.message);
+        setIsAnalyzing(false);
+      }
     }, 800);
   };
 
@@ -153,6 +188,7 @@ export default function App() {
     setExpandedPerson(null);
     setDismissedAnomalies(new Set());
     setSelectedAnomalies(new Set());
+    setError(null);
   };
 
   const handleDismiss = (id: string) => {
@@ -414,6 +450,15 @@ export default function App() {
               <p className="text-gray-500 text-lg">Wgraj ewidencję czasu pracy, aby wykryć nieprawidłowości w projektach Qodeca.</p>
             </div>
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-8 space-y-8">
+              {error && (
+                <div className="bg-red-50 border border-red-100 p-4 rounded-xl flex items-center gap-3 text-red-600 animate-in fade-in slide-in-from-top-2">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  <p className="text-sm font-medium">{error}</p>
+                  <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               <div className="space-y-4">
                 <label className="text-sm font-bold uppercase tracking-wider text-gray-400">Dane CSV</label>
                 <textarea
@@ -439,6 +484,15 @@ export default function App() {
             </div>
             
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-8 space-y-8">
+              {error && (
+                <div className="bg-red-50 border border-red-100 p-4 rounded-xl flex items-center gap-3 text-red-600 animate-in fade-in slide-in-from-top-2">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  <p className="text-sm font-medium">{error}</p>
+                  <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto p-2">
                 {uniqueProjects.map(project => (
                   <label key={project} className={cn(
