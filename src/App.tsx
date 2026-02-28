@@ -43,9 +43,7 @@ import * as XLSX from 'xlsx';
 
 export default function App() {
   const [csvData, setCsvData] = useState('');
-  const [billableProjects, setBillableProjects] = useState(DEFAULT_BILLABLE_PROJECTS.join(', '));
-  const [internalProjects, setInternalProjects] = useState(DEFAULT_INTERNAL_PROJECTS.join(', '));
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [billableProjects] = useState(DEFAULT_BILLABLE_PROJECTS.join(', '));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<Severity | 'ALL'>('ALL');
@@ -425,32 +423,12 @@ export default function App() {
                   className="w-full h-64 bg-[#f8f9fa] border border-gray-200 rounded-xl p-6 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#e2f331] transition-all resize-none"
                 />
               </div>
-              <div className="flex items-center justify-between pt-4">
-                <button onClick={() => setIsConfigOpen(!isConfigOpen)} className="text-sm font-bold text-gray-500 hover:text-black flex items-center gap-2 transition-colors">
-                  {isConfigOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  Konfiguracja Projektów
-                </button>
+              <div className="flex items-center justify-end pt-4">
                 <button onClick={handleUpload} disabled={isAnalyzing || !csvData.trim()} className={cn("px-8 py-3 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg", isAnalyzing || !csvData.trim() ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-[#e2f331] hover:bg-[#d4e52a] text-black active:scale-[0.98]")}>
                   {isAnalyzing ? <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" /> : <Plus className="w-5 h-5" />}
                   Wgraj i wybierz projekty
                 </button>
               </div>
-              <AnimatePresence>
-                {isConfigOpen && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="space-y-6 pt-6 border-t border-gray-100 overflow-hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase">Projekty Klienckie (billable)</label>
-                        <textarea value={billableProjects} onChange={(e) => setBillableProjects(e.target.value)} className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#e2f331] h-24" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase">Projekty Wewnętrzne (Domyślne)</label>
-                        <textarea value={internalProjects} onChange={(e) => setInternalProjects(e.target.value)} className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#e2f331] h-24" />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           </div>
         ) : isSelectingProjects ? (
